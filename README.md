@@ -1,7 +1,8 @@
 # Linking_Loader
 
-LINK1IN.DAT
-
+Object Program : LINK1IN.DAT
+Beginning Address : 4000
+```
 Load Map :
 
 Control      Symbol
@@ -17,7 +18,6 @@ PROGC                     40E2         51
              LISTC        4112
              ENDC         4124
 
-			 
 Memory Address :
 
 Memory
@@ -47,3 +47,4 @@ Address   Contents
 4100      -------- -------- -------- --------
 4110      -------- -------- -------- --------
 4120      -------- 10412600 00080040 51000004
+```
