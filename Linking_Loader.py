@@ -28,13 +28,13 @@ class Linking_Loader(object):
                 if key == each:
                     return True
             return False
-        def putin(place, string):
+        def putin(place, string, fillingstr):
             locctr = place - place % 16
             if(iskey_exist(locctr)):
                 able = 32 - len(self.memory_address[locctr])
                 if(len(string) > able):
                     self.memory_address[locctr] += string[:able]
-                    putin(locctr + 16, string[able:])
+                    putin(locctr + 16, string[able:], fillingstr)
                 else:
                     self.memory_address[locctr] += string
             else:
@@ -42,20 +42,28 @@ class Linking_Loader(object):
                 contents = ''
                 able = 32 - empty_num
                 for i in range(0, empty_num):
-                    contents += 'x'
+                    contents += fillingstr
                 if(len(string) > able):
                     self.memory_address[locctr] = contents + string[:able]
-                    putin(locctr + 16, string[able:])
+                    putin(locctr + 16, string[able:], fillingstr)
                 else:
                     self.memory_address[locctr] = contents + string
         begin = 0
-        locctr = 0
+
         for each in self.source_code:
             if(each[0] == 'H'):
                 begin = self.load_map[each[1:7]][0]
+                if self.beginning_address - self.beginning_address % 16 == begin:
+                    first = True
+                else:
+                    first = False
             elif(each[0] == 'T'):
                 locctr = begin + int(each[1:7], 16)
-                putin(locctr, each[9:9 + int(each[7:9], 16) * 2])
+                if first:
+                    first = False
+                    putin(locctr, each[9:9 + int(each[7:9], 16) * 2], 'x')
+                else:
+                    putin(locctr, each[9:9 + int(each[7:9], 16) * 2], '-')
             elif(each[0] == 'M'):
                 locctr = begin + int(each[1:7], 16)
                 place = locctr % 16
@@ -67,20 +75,41 @@ class Linking_Loader(object):
                 if(length % 2 == 1):
                     place += 1
                 temp = self.memory_address[locctr]
-                target = int(temp[place:place + length], 16)
-                #print(temp[place:place + length], end='\n')
-                if(type(self.load_map[sysbol]) == tuple):
-                    if(flag == '+'):
-                        target += self.load_map[sysbol][0]
-                    elif(flag == '-'):
-                        target -= self.load_map[sysbol][0]
-                elif (type(self.load_map[sysbol]) == int):
-                    if (flag == '+'):
-                        target += self.load_map[sysbol]
-                    elif (flag == '-'):
-                        target -= self.load_map[sysbol]
-                temp = temp[:place] + fillstr((hex(target)[2:]), length).upper() + temp[place + length:]
-                self.memory_address[locctr] = temp
+                ori = len(temp[place:place + length])
+                if( ori != length):
+                    dif = length - ori
+                    merge = temp[place:place + length] + self.memory_address[locctr + 16][:dif]
+                    target = int(merge, 16)
+                    if (type(self.load_map[sysbol]) == tuple):
+                        if (flag == '+'):
+                            target += self.load_map[sysbol][0]
+                        elif (flag == '-'):
+                            target -= self.load_map[sysbol][0]
+                    elif (type(self.load_map[sysbol]) == int):
+                        if (flag == '+'):
+                            target += self.load_map[sysbol]
+                        elif (flag == '-'):
+                            target -= self.load_map[sysbol]
+                    result = fillstr((hex(target)[2:]), length).upper()
+                    temp = temp[:place] + result[:ori]
+                    self.memory_address[locctr] = temp
+                    temp = self.memory_address[locctr + 16]
+                    temp = result[ori:] + temp[dif:]
+                    self.memory_address[locctr + 16] = temp
+                else:
+                    target = int(temp[place:place + length], 16)
+                    if (type(self.load_map[sysbol]) == tuple):
+                        if (flag == '+'):
+                            target += self.load_map[sysbol][0]
+                        elif (flag == '-'):
+                            target -= self.load_map[sysbol][0]
+                    elif (type(self.load_map[sysbol]) == int):
+                        if (flag == '+'):
+                            target += self.load_map[sysbol]
+                        elif (flag == '-'):
+                            target -= self.load_map[sysbol]
+                    temp = temp[:place] + fillstr((hex(target)[2:]), length).upper() + temp[place + length:]
+                    self.memory_address[locctr] = temp
 
     def build_load_map(self):
         baklocctr = self.beginning_address
@@ -105,10 +134,8 @@ class Linking_Loader(object):
         print('Control', 'Symbol ', sep='      ', end='\n')
         print('Section', 'Name   ', 'Address', 'Length', sep='      ', end='\n')
         print('---------------------------------------------', end='\n')
-        locctr = 0
         for i, j in self.load_map.items():
             if (type(j) == tuple):
-                locctr = j[0]
                 print(i + ' ', '       ', fillstr(hex(j[0])[2:].upper(), '       '), hex(j[1])[2:].upper(),
                       sep='      ', end='\n')
             elif (type(j) == int):
@@ -147,12 +174,28 @@ class Linking_Loader(object):
         print('Memory', end='\n')
         print('Address', 'Contents', sep='   ', end='\n')
         print('----------------------------------------------', end='\n')
+        last = self.beginning_address - self.beginning_address % 16 - 32
         for i, j in self.memory_address.items():
-            print(fillstr(hex(i)[2:].upper(), '       '), end='   ')
-            print(j[0], j[1], j[2], j[3], sep=' ', end='\n')
+            dif = i - last
+            if dif == 16:
+                print(fillstr(hex(i)[2:].upper(), '       '), end='   ')
+                print(j[0], j[1], j[2], j[3], sep=' ', end='\n')
+            else:
+                for k in range(1, int(dif / 16)):
+                    print(fillstr(hex(last + k * 16)[2:].upper(), '       '), end='   ')
+                    if last == self.beginning_address - self.beginning_address % 16 - 32 and k == 1:
+                        print('xxxxxxxx', 'xxxxxxxx', 'xxxxxxxx', 'xxxxxxxx', sep=' ', end='\n')
+                    else:
+                        print('--------', '--------', '--------', '--------', sep=' ', end='\n')
+                print(fillstr(hex(i)[2:].upper(), '       '), end='   ')
+                print(j[0], j[1], j[2], j[3], sep=' ', end='\n')
+                last = i
+
 
 if __name__ == '__main__':
-    l = Linking_Loader(file='2.17.obj')
+    name = input('Object Program : ')
+    begin = input('Beginning Address : ')
+    l = Linking_Loader(file=name, beginning_address=int(begin, 16))
     print('\nLoad Map : \n')
     l.show_load_map()
     print('\nMemory Address : \n')
